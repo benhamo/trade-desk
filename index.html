@@ -150,7 +150,11 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
   .settog{display:flex;align-items:center;gap:6px;min-width:0;max-width:60%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:.82rem;cursor:pointer}
   #setSummary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .settog[aria-expanded=true] .chev{transform:rotate(180deg)}
-  header.collapsed .controls{display:none}
+  header.collapsed .controls > .field:not(.keep){display:none}
+  .seg button{padding:6px 7px;font-size:.88rem}
+  .tol{gap:6px}
+  .tol input{width:70px}
+  .controls{gap:10px}
   .controls{padding-block:0 12px}
   nav.tabs a{flex:1;text-align:center;padding:10px 6px;font-size:.88rem}
   main{padding-block:14px 40px}
@@ -174,13 +178,13 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
       <div class="field" id="leagueField" hidden><label class="label" for="leagueSel">League</label><select id="leagueSel"></select></div>
       <div class="field inline"><span class="label">&nbsp;</span><button class="btn" id="loadBtn" type="submit">Load league</button></div>
       <div class="field" id="teamField" hidden><label class="label" for="teamSel">Team to plan for</label><select id="teamSel"></select></div>
-      <div class="field inline"><span class="label" id="modeLbl">Mode</span>
+      <div class="field inline keep"><span class="label" id="modeLbl">Mode</span>
         <div class="seg" role="group" aria-labelledby="modeLbl" id="modeSeg">
           <button type="button" data-mode="contend" aria-pressed="false">Contend</button>
           <button type="button" data-mode="balanced" aria-pressed="true">Balanced</button>
           <button type="button" data-mode="rebuild" aria-pressed="false">Rebuild</button>
         </div></div>
-      <div class="field inline"><label class="label" for="tol">Fairness band</label>
+      <div class="field inline keep"><label class="label" for="tol">Fairness band</label>
         <div class="tol"><input id="tol" type="range" min="3" max="20" step="1" value="10"><span class="num" id="tolOut">±10%</span></div></div>
       <div class="field inline"><span class="label">&nbsp;</span><button class="btn ghost" id="refreshBtn" type="button" disabled>Refresh data</button></div>
     </form>
@@ -723,7 +727,7 @@ recompute = function(){ _recompute(); setTab(S.tab); updateSummary(); };
 function setCollapsed(c){ document.querySelector('header.top').classList.toggle('collapsed', c); $('#setToggle').setAttribute('aria-expanded', !c); }
 function updateSummary(){
   const t = teamOf(S.myRid);
-  $('#setSummary').textContent = t ? `${t.name} · ${S.mode[0].toUpperCase() + S.mode.slice(1)} · ±${S.tol}%` : 'Settings';
+  $('#setSummary').textContent = t ? t.name : 'Settings';
 }
 $('#setToggle').addEventListener('click', () => setCollapsed(!document.querySelector('header.top').classList.contains('collapsed')));
 let wasLoaded = false;

@@ -242,7 +242,7 @@ const MAX_WIN = .15; // ideas never ask a manager to lose more than this past yo
 const tolText = t => (t > 0 ? '+' : t < 0 ? '−' : '') + Math.abs(t) + '%';
 
 const S = {league:null, teams:[], fcByName:new Map(), slots:[], myRid:null, mode:'balanced', tol:0,
-  ideas:[], stats:null, userId:null, leagueId:null, tab:'team', calc:{partner:null, give:new Set(), get:new Set()}, unvalued:0};
+  ideas:[], stats:null, userId:null, leagueId:null, tab:'team', calc:{a:null, partner:null, give:new Set(), get:new Set()}, unvalued:0};
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -640,38 +640,45 @@ function renderIdeas(){
 }
 
 function renderCalc(){
-  const el = $('#p-calc'), me = teamOf(S.myRid);
-  const others = S.teams.filter(t => t.rid !== S.myRid);
-  if (!S.calc.partner || S.calc.partner === S.myRid || !teamOf(S.calc.partner)) { S.calc.partner = others[0]?.rid; S.calc.give.clear(); S.calc.get.clear(); }
-  const t = teamOf(S.calc.partner);
+  const el = $('#p-calc'), c = S.calc;
+  if (!teamOf(c.a)) { c.a = S.myRid; c.give.clear(); }
+  if (!teamOf(c.partner) || c.partner === c.a) { c.partner = S.teams.find(t => t.rid !== c.a)?.rid; c.get.clear(); }
+  const A = teamOf(c.a), B = teamOf(c.partner);
+  const opts = (exclude) => S.teams.filter(t => t.rid !== exclude).map(t => `<option value="${t.rid}">${esc(t.name)}${t.rid === S.myRid ? ' (planning)' : ''}</option>`).join('');
   const list = (assets, set, side) => assets.slice().sort((a,b) => b.value - a.value).map(a =>
     `<label><input type="checkbox" data-side="${side}" value="${esc(a.id)}" ${set.has(a.id) ? 'checked' : ''}><span class="pp">${a.kind === 'pick' ? 'PICK' : a.pos}</span>${esc(a.name)}${a.via ? ` <span class="muted">via ${esc(a.via)}</span>` : ''}<span class="v num">${fmt(a.value)}</span></label>`).join('');
-  el.innerHTML = `<div><h2>Trade calculator</h2><p class="muted" style="margin:4px 0 0">Tick assets on both sides. Fairness uses FantasyCalc values with a consolidation adjustment, so two mid players don't automatically equal one star.</p></div>
-    <div class="field" style="max-width:20rem"><label class="label" for="cPartner">Trade partner</label><select id="cPartner">${others.map(o => `<option value="${o.rid}">${esc(o.name)}</option>`).join('')}</select></div>
+  el.innerHTML = `<div><h2>Trade calculator</h2><p class="muted" style="margin:4px 0 0">Pick any two teams and tick assets on both sides. Fairness uses FantasyCalc values with a consolidation adjustment, so two mid players don't automatically equal one star.</p></div>
+    <div class="filters"><div class="field"><label class="label" for="cTeamA">Team A</label><select id="cTeamA">${opts(null)}</select></div>
+    <div class="field"><label class="label" for="cPartner">Team B</label><select id="cPartner">${opts(c.a)}</select></div></div>
     <div id="cResult"></div>
-    <div class="calc"><div class="side"><span class="label">You give (${esc(me.name)})</span><div class="pick-list">${list(me.assets, S.calc.give, 'give')}</div></div>
-    <div class="side"><span class="label">You get (${esc(t.name)})</span><div class="pick-list">${list(t.assets, S.calc.get, 'get')}</div></div></div>`;
-  $('#cPartner').value = S.calc.partner;
+    <div class="calc"><div class="side"><span class="label">${esc(A.name)} gives</span><div class="pick-list">${list(A.assets, c.give, 'give')}</div></div>
+    <div class="side"><span class="label">${esc(B.name)} gives</span><div class="pick-list">${list(B.assets, c.get, 'get')}</div></div></div>`;
+  $('#cTeamA').value = c.a; $('#cPartner').value = c.partner;
   renderCalcResult();
 }
 function renderCalcResult(){
   const el = $('#cResult'); if (!el) return;
-  const me = teamOf(S.myRid), t = teamOf(S.calc.partner);
-  const give = me.assets.filter(a => S.calc.give.has(a.id)), get = t.assets.filter(a => S.calc.get.has(a.id));
+  const A = teamOf(S.calc.a), B = teamOf(S.calc.partner), mine = A.rid === S.myRid;
+  const give = A.assets.filter(a => S.calc.give.has(a.id)), get = B.assets.filter(a => S.calc.get.has(a.id));
   if (!give.length && !get.length) { el.innerHTML = '<div class="empty">Pick at least one asset on either side to see the verdict.</div>'; return; }
-  const f = fairness(give, get), W = WEIGHTS[S.mode];
+  const f = fairness(give, get);
   const gi = new Set(give.map(a => a.id)), ri = new Set(get.map(a => a.id));
-  const myGain = teamScore(me.assets.filter(a => !gi.has(a.id)).concat(get), effVal, W) - teamScore(me.assets, effVal, W);
-  const theirGain = teamScore(t.assets.filter(a => !ri.has(a.id)).concat(give), rawVal, WEIGHTS.balanced) - teamScore(t.assets, rawVal, WEIGHTS.balanced);
-  const before = gradesFor(me.assets).g, after = gradesFor(me.assets.filter(a => !gi.has(a.id)).concat(get)).g;
-  const chg = GRADE_POS.filter(p => before[p] !== after[p]).map(p => `${p}: ${before[p]} → ${after[p]}`).join(', ') || 'None';
-  const inBand = f.pct >= S.tol / 100;
+  const afterA = A.assets.filter(a => !gi.has(a.id)).concat(get), afterB = B.assets.filter(a => !ri.has(a.id)).concat(give);
+  // The team you're planning for is scored in your chosen mode; anyone else on plain dynasty values
+  const gain = (t, after) => t.rid === S.myRid
+    ? teamScore(after, effVal, WEIGHTS[S.mode]) - teamScore(t.assets, effVal, WEIGHTS[S.mode])
+    : teamScore(after, rawVal, WEIGHTS.balanced) - teamScore(t.assets, rawVal, WEIGHTS.balanced);
+  const gA = gain(A, afterA), gB = gain(B, afterB);
+  const chg = (t, after) => { const b = gradesFor(t.assets).g, a = gradesFor(after).g; return GRADE_POS.filter(p => b[p] !== a[p]).map(p => `${p}: ${b[p]} → ${a[p]}`).join(', ') || 'None'; };
+  const p = Math.round(Math.abs(f.pct) * 100);
+  const verdict = p < 3 ? 'Even trade' : `${f.pct > 0 ? A.name : B.name} wins by ${p}%`;
+  const lim = mine ? f.pct >= S.tol / 100 : B.rid === S.myRid ? -f.pct >= S.tol / 100 : null;
+  const modeTag = t => t.rid === S.myRid ? S.mode : 'dynasty';
   el.innerHTML = `<div class="result">
-    <div><span class="label">Verdict</span><div class="big">${fairText(f)}</div><span class="pill ${inBand ? 'Likely' : 'Longshot'}">${inBand ? 'Meets' : 'Below'} your ${tolText(S.tol)} limit</span></div>
-    <div><span class="label">Value (raw / adjusted)</span><div class="num">Give ${fmt(f.rawGive)} / ${fmt(f.give)}</div><div class="num">Get ${fmt(f.rawGet)} / ${fmt(f.get)}</div></div>
-    <div><span class="label">Your lineup (${S.mode})</span><div class="big num ${myGain >= 0 ? 'up' : 'down'}">${sgn(myGain)}</div></div>
-    <div><span class="label">Their lineup</span><div class="big num ${theirGain >= 0 ? 'up' : 'down'}">${sgn(theirGain)}</div></div>
-    <div><span class="label">Your grade changes</span><div>${esc(chg)}</div></div></div>`;
+    <div><span class="label">Verdict</span><div class="big">${esc(verdict)}</div>${lim === null ? '' : `<span class="pill ${lim ? 'Likely' : 'Longshot'}">${lim ? 'Meets' : 'Below'} your ${tolText(S.tol)} limit</span>`}</div>
+    <div><span class="label">Value (raw / adjusted)</span><div class="num">${esc(A.name)}: ${fmt(f.rawGive)} / ${fmt(f.give)}</div><div class="num">${esc(B.name)}: ${fmt(f.rawGet)} / ${fmt(f.get)}</div></div>
+    <div><span class="label">${esc(A.name)} lineup (${modeTag(A)})</span><div class="big num ${gA >= 0 ? 'up' : 'down'}">${sgn(gA)}</div><div style="font-size:.85rem">${esc(chg(A, afterA))}</div></div>
+    <div><span class="label">${esc(B.name)} lineup (${modeTag(B)})</span><div class="big num ${gB >= 0 ? 'up' : 'down'}">${sgn(gB)}</div><div style="font-size:.85rem">${esc(chg(B, afterB))}</div></div></div>`;
 }
 
 /* ---------- events ---------- */
@@ -706,6 +713,7 @@ document.querySelector('nav.tabs').addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches('#fPartner,#fPos,#fShape')) renderIdeas();
+  if (e.target.id === 'cTeamA') { S.calc.a = +e.target.value; S.calc.give.clear(); if (S.calc.partner === S.calc.a) S.calc.partner = null; renderCalc(); }
   if (e.target.id === 'cPartner') { S.calc.partner = +e.target.value; S.calc.get.clear(); renderCalc(); }
   if (e.target.matches('input[data-side]')) {
     const set = e.target.dataset.side === 'give' ? S.calc.give : S.calc.get;
@@ -719,7 +727,7 @@ document.addEventListener('click', e => {
   const c = e.target.closest('[data-open-calc]');
   if (c) {
     const idea = S.ideas[+c.dataset.openCalc];
-    S.calc = {partner: idea.partner.rid, give: new Set(idea.give.map(a => a.id)), get: new Set(idea.get.map(a => a.id))};
+    S.calc = {a: S.myRid, partner: idea.partner.rid, give: new Set(idea.give.map(a => a.id)), get: new Set(idea.get.map(a => a.id))};
     renderCalc(); history.replaceState(null, '', '#calc'); setTab('calc'); window.scrollTo(0, 0);
   }
 });

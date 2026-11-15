@@ -153,8 +153,10 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
   #setSummary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .settog[aria-expanded=true] .chev{transform:rotate(180deg)}
   header.collapsed .controls > .field:not(.keep){display:none}
-  #teamField{order:1;flex:1 1 0}
-  #refreshField{order:2}
+  #teamField{order:1;flex:1 1 55%}
+  #teamField .label{white-space:nowrap}
+  #refreshField{order:2;flex:0 0 auto}
+  .controls .field.keep.inline:not(#refreshField){flex:0 0 auto}
   .controls .field.keep.inline:not(#refreshField){order:3}
   .tframe th:first-child,.tframe td:first-child{position:sticky;left:0;background:var(--surface);z-index:1;white-space:normal;min-width:7.5rem;max-width:9.5rem}
   .tframe th:first-child{z-index:2}

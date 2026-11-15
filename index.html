@@ -111,6 +111,7 @@ tr.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .slot.start{background:var(--accent-soft);color:var(--accent)}
 .up{color:var(--good)} .down{color:var(--bad)}
 .hm td.cell{text-align:center;font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.linkbtn.small{font-size:.8rem;font-weight:500}
 .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-weight:600}
 
 /* ideas */
@@ -152,6 +153,11 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
   #setSummary{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .settog[aria-expanded=true] .chev{transform:rotate(180deg)}
   header.collapsed .controls > .field:not(.keep){display:none}
+  #teamField{order:1;flex:1 1 0}
+  #refreshField{order:2}
+  .controls .field.keep.inline:not(#refreshField){order:3}
+  .tframe th:first-child,.tframe td:first-child{position:sticky;left:0;background:var(--surface);z-index:1;white-space:normal;min-width:7.5rem;max-width:9.5rem}
+  .tframe th:first-child{z-index:2}
   .seg button{padding:6px 7px;font-size:.88rem}
   .tol{gap:6px}
   .tol input{width:70px}
@@ -178,7 +184,7 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
       <div class="field"><label class="label" for="q">Sleeper username or league ID</label><input id="q" type="text" autocomplete="off" placeholder="e.g. yourname"></div>
       <div class="field" id="leagueField" hidden><label class="label" for="leagueSel">League</label><select id="leagueSel"></select></div>
       <div class="field inline"><span class="label">&nbsp;</span><button class="btn" id="loadBtn" type="submit">Load league</button></div>
-      <div class="field" id="teamField" hidden><label class="label" for="teamSel">Team to plan for</label><select id="teamSel"></select></div>
+      <div class="field keep" id="teamField" hidden><label class="label" for="teamSel">Team to plan for</label><select id="teamSel"></select></div>
       <div class="field inline keep"><span class="label" id="modeLbl">Mode</span>
         <div class="seg" role="group" aria-labelledby="modeLbl" id="modeSeg">
           <button type="button" data-mode="contend" aria-pressed="false">Contend</button>
@@ -187,7 +193,7 @@ footer{font-size:.8rem;color:var(--muted);padding-block:0 32px}
         </div></div>
       <div class="field inline keep"><label class="label" for="tol" title="The worst value split you'll accept. 0% means you never give up value.">Min fairness</label>
         <div class="tol"><input id="tol" type="range" min="-10" max="10" step="1" value="0"><span class="num" id="tolOut">0%</span></div></div>
-      <div class="field inline"><span class="label">&nbsp;</span><button class="btn ghost" id="refreshBtn" type="button" disabled>Refresh data</button></div>
+      <div class="field inline keep" id="refreshField"><span class="label">&nbsp;</span><button class="btn ghost" id="refreshBtn" type="button" disabled>Refresh data</button></div>
     </form>
   </div>
 </header>
@@ -598,12 +604,11 @@ function renderLeague(){
     return `<td class="cell" style="background:color-mix(in srgb,${c} ${pct}%,var(--surface))">${ord(rank)}</td>`;
   };
   let h = `<h2>League heat map</h2><p class="muted" style="margin:0">Each cell is that team's rank at the position in ${S.mode} mode. Green is a surplus, red a need. A team that is green where you are red is your natural trade partner.</p>
-  <div class="tframe hm"><table><thead><tr><th>Team</th>${GRADE_POS.map(p => `<th class="r">${p === 'PICK' ? 'Picks' : p}</th>`).join('')}<th class="r">Overall</th><th class="r">Win-now</th><th class="r">Starter age</th><th></th></tr></thead><tbody>`;
+  <div class="tframe hm"><table><thead><tr><th>Team</th>${GRADE_POS.map(p => `<th class="r">${p === 'PICK' ? 'Picks' : p}</th>`).join('')}<th class="r">Overall</th><th class="r">Win-now</th><th class="r">Starter age</th></tr></thead><tbody>`;
   for (const r of rows) {
     const me = r.t.rid === S.myRid;
-    h += `<tr class="${me ? 'mine' : ''}"><td>${esc(r.t.name)}${me ? ' <span class="muted">(planning)</span>' : ''}</td>${GRADE_POS.map(p => cell(r.z[p], r['rank_'+p])).join('')}
-      <td class="r num">${ord(r.rankTotal)}</td><td class="r num">${ord(r.rankWin)}</td><td class="r num">${r.startAge ? r.startAge.toFixed(1) : '—'}</td>
-      <td>${me ? '' : `<button class="linkbtn" data-ideas-for="${r.t.rid}">Trade ideas</button>`}</td></tr>`;
+    h += `<tr class="${me ? 'mine' : ''}"><td class="tname">${esc(r.t.name)}${me ? ' <span class="muted">(planning)</span>' : `<br><button class="linkbtn small" data-ideas-for="${r.t.rid}">Trade ideas →</button>`}</td>${GRADE_POS.map(p => cell(r.z[p], r['rank_'+p])).join('')}
+      <td class="r num">${ord(r.rankTotal)}</td><td class="r num">${ord(r.rankWin)}</td><td class="r num">${r.startAge ? r.startAge.toFixed(1) : '—'}</td></tr>`;
   }
   $('#p-league').innerHTML = h + '</tbody></table></div>';
 }
@@ -739,7 +744,7 @@ recompute = function(){ _recompute(); setTab(S.tab); updateSummary(); };
 function setCollapsed(c){ document.querySelector('header.top').classList.toggle('collapsed', c); $('#setToggle').setAttribute('aria-expanded', !c); }
 function updateSummary(){
   const t = teamOf(S.myRid);
-  $('#setSummary').textContent = t ? t.name : 'Settings';
+  $('#setSummary').textContent = S.league ? 'Change league' : 'Settings';
 }
 $('#setToggle').addEventListener('click', () => setCollapsed(!document.querySelector('header.top').classList.contains('collapsed')));
 let wasLoaded = false;
